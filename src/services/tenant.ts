@@ -56,6 +56,8 @@ export class TenantService implements ITenantService{
     }
 
     public exists = async (id: string): Promise<boolean> => {
+        if(!ObjectId.isValid(id))
+            throw new ArgumentError("id", "id is not valid");
         const tenant = 
          await this.
             _mongoClient
@@ -66,6 +68,8 @@ export class TenantService implements ITenantService{
     }
 
     public get = async (id: string): Promise<ITenant> => {
+        if(!ObjectId.isValid(id))
+            throw new ArgumentError("id", "id is not valid");
         const tenant = 
          await this.
             _mongoClient
@@ -95,6 +99,8 @@ export class TenantService implements ITenantService{
     }
 
     public delete = async (id: string): Promise<void> => {
+        if(!ObjectId.isValid(id))
+            throw new ArgumentError("id", "id is not valid");
          await this.
             _mongoClient
                 .db()
@@ -103,6 +109,8 @@ export class TenantService implements ITenantService{
     }
 
     public update = async (id: string, tenant: IUpdateTenant): Promise<void> => {
+        if(!ObjectId.isValid(id))
+            throw new ArgumentError("id", "id is not valid");
         const set: any = {};
         if(tenant.name)
             set.name = tenant.name;
@@ -119,6 +127,8 @@ export class TenantService implements ITenantService{
     }
 
     public replace = async (id: string, tenant: IUpdateTenant): Promise<void> => {
+        if(!ObjectId.isValid(id))
+            throw new ArgumentError("id", "id is not valid");
         const oldTenant =
          await this.
             _mongoClient

@@ -1,36 +1,23 @@
 import { MongoClient, ObjectId } from "mongodb";
-import { ILogItem, ILogRequest, LogType } from "../data/models/log-item";
 import { injectable } from "inversify";
 import { IFilter } from "../dtos/filter";
 import { IPagedList } from "../dtos/paged-list";
 import { ArgumentError } from "../errors/argument";
 import { AggregateBuilder } from "../data/helpers/aggregate-builder";
+import { IUserActivity } from "../data/models/user-activity";
 
-export interface ILogService{
-    get(id: string): Promise<ILogItem>;
-    getMany(filter: IFilter, tenant_id: string): Promise<IPagedList<ILogItem>>;
-    log({type, message, tenant_id, user_id, username, request}:{type: LogType, message: string, tenant_id?: string, user_id?: string, username?: string, request?: ILogRequest}): Promise<ObjectId>;
+export interface IUserActivityService{
+    getMany(filter: IFilter, tenant_id: string): Promise<IPagedList<IUserActivity>>;
+    log({tenant_id, user_id, username, action, path, reference, message}:{tenant_id: string, user_id: string, username: string, action: string, path: string, reference?: string, message?: string}): Promise<void>;
 }
 @injectable()
-export class LogService implements ILogService{
+export class UserActivityService implements IUserActivityService{
     _mongoClient: MongoClient;
     constructor(mongoClient: MongoClient){
         this._mongoClient = mongoClient;
     }
-    
-    public get = async (id: string): Promise<ILogItem> => {
-        if(!ObjectId.isValid(id))
-            throw new ArgumentError("id", "id is not valid");
-        const user = 
-            await this.
-            _mongoClient
-                .db()
-                .collection<ILogItem>("logs")
-                .findOne({ _id: ObjectId.createFromHexString(id) });
-        return user;
-    }
 
-    public getMany = async (filter: IFilter, tenant_id: string): Promise<IPagedList<ILogItem>> =>{
+    public getMany = async (filter: IFilter, tenant_id: string): Promise<IPagedList<IUserActivity>> =>{
         if(!ObjectId.isValid(tenant_id))
             throw new ArgumentError("tenant_id", "tenant_id is not valid");
         if(!filter.equal)
@@ -42,10 +29,10 @@ export class LogService implements ILogService{
             await this.
             _mongoClient
                 .db()
-                .collection<ILogItem>("logs")
+                .collection<IUserActivity>("user-activity")
                 .aggregate(aggregate)
                 .toArray();
-        const pagedList: IPagedList<ILogItem> = {
+        const pagedList: IPagedList<IUserActivity> = {
             items: result[0].data,
             page: filter.page,
             page_size: filter.page_size,
@@ -55,21 +42,20 @@ export class LogService implements ILogService{
         return pagedList;
     }
 
-    public log = async ({type, message, tenant_id, user_id, username, request}:{type: LogType, message: string, tenant_id: string, user_id: string, username: string, request?: ILogRequest}): Promise<ObjectId> =>{
-        const logItem: ILogItem = {
-            _id: null,
-            type: type,
+    public log = async ({tenant_id, user_id, username, action, path, reference, message}:{tenant_id: string, user_id: string, username: string, action: string, path: string, reference?: string, message?: string}): Promise<void> =>{
+        const logItem: IUserActivity = {
             tenant_id: tenant_id,
             user_id: user_id,
             username: username,
+            action: action,
+            path: path,
+            reference: reference,
             message: message,
-            request: request,
             created_on: new Date()
         };
         await this._mongoClient
             .db()
-            .collection("logs")
+            .collection("user-activity")
             .insertOne(logItem);
-        return logItem._id;
     }
 };

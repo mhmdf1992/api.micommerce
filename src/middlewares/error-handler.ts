@@ -19,18 +19,23 @@ export const errorHandler = async (err, req, res, next) =>{
         res.status(404).send({ status_code: 404, message: err.message});
         return next();
     }
-    const logger = container.get<ILogService>(types.Logger);
-    const logId = await logger.log("error", err.message, {
+    const logger = container.get<ILogService>(types.LogService);
+    const logId = await logger.log({
+        type: "error",
+        message: err.message,
+        user_id: req.jwtPayload.user_id,
+        tenant_id: req.jwtPayload.tenant_id,
+        username: req.jwtPayload.username,
         request:{
             params: req.params,
             query: req.query,
             headers: req.rawHeaders,
             url: req.url,
-            body: req.body
-        },
-        response: {
-            status_code: 500, 
-            message: err.message
+            body: req.body,
+            response: {
+                status_code: 500, 
+                message: err.message
+            }
         }
     })
     res.status(500).send({ status_code: 500, message: err.message, _id: logId });

@@ -8,7 +8,7 @@ export const superUserAuth = (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
     if (token == null)
         throw new Unauthorized("Token is not valid.")
-    jwt.verify(token, req.env.JWT_SECRET, (err: any, user: any) => {
+    jwt.verify(token, process.env.JWT_SECRET, (err: any, user: any) => {
         if(err)
             throw new Unauthorized("Token is not valid.");
         const payload = jwt.decode(token) as JWTPayload;

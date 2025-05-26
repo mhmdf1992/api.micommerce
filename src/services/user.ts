@@ -21,9 +21,9 @@ export interface IUserService{
     exists(id: string): Promise<boolean>;
     get(id: string): Promise<IUser>;
     getMany(filter: IFilter, tenant_id: string): Promise<IPagedList<IUser>>;
-    delete(id: string): Promise<void>;
-    update(id: string, user: IUpdateUser): Promise<void>;
-    replace(id: string, user: IUpdateUser): Promise<void>;
+    delete(id: string): Promise<string>;
+    update(id: string, user: IUpdateUser): Promise<string>;
+    replace(id: string, user: IUpdateUser): Promise<string>;
     create(user: ICreateUser, tenant_id: string): Promise<ObjectId>;
 }
 
@@ -40,23 +40,27 @@ export class UserService implements IUserService{
             _mongoClient
                 .db()
                 .collection("users")
-                .findOne({ role: UserRole.SUPER_USER, disabled: false }, { projection: {"_id": 1} });
+                .findOne({ role: UserRole.SUPER_USER }, { projection: {"_id": 1} });
         return !user ? false : true;
     }
 
     public authenticateSuper = async (username: string, password: string, tenant_id: string): Promise<ILoginResponse> => {
+        if(!ObjectId.isValid(tenant_id))
+            throw new ArgumentError("tenant_id", "tenant_id is not valid");
+        UserService.validateUsername(username);
+        UserService.validatePassword(password);
         const user =
          await this.
             _mongoClient
                 .db()
                 .collection("users")
-                .findOne({ username: username, disabled: false }, { projection: { "_id": 1, "username": 1, "password": 1, "role": 1, "tenant_id": 1, "disabled": 1 } });
-        if(!user || user.tenant_id || password !== user.password)
+                .findOne({ username: username, tenant_id: null, role: UserRole.SUPER_USER, disabled: false }, { projection: { "_id": 1, "password": 1 } });
+        if(!user || password !== user.password)
             throw new Unauthorized("Username or password is incorrect.");
         const payload: JWTPayload ={
             user_id: user._id.toHexString(),
-            username: user.username,
-            role: user.role,
+            username: username,
+            role: UserRole.SUPER_USER,
             tenant_id: tenant_id
         };
         const token = jwt.sign(
@@ -67,23 +71,28 @@ export class UserService implements IUserService{
             }
         );
         const res: ILoginResponse = {
-            token: token
+            token: token,
+            user_id: user._id.toHexString()
         }
         return res;
     }
 
     public authenticate = async (username: string, password: string, tenant_id: string): Promise<ILoginResponse> => {
+        if(!ObjectId.isValid(tenant_id))
+            throw new ArgumentError("tenant_id", "tenant_id is not valid");
+        UserService.validateUsername(username);
+        UserService.validatePassword(password);
         const user =
          await this.
             _mongoClient
                 .db()
                 .collection("users")
-                .findOne({ username: username, tenant_id: tenant_id, disabled: false }, { projection: { "_id": 1, "username": 1, "password": 1, "role": 1, "tenant_id": 1, "disabled": 1 } });
+                .findOne({ username: username, tenant_id: tenant_id, disabled: false }, { projection: { "_id": 1, "password": 1, "role": 1 } });
         if(!user || password !== user.password)
             throw new Unauthorized("Username or password is incorrect.");
         const payload: JWTPayload ={
             user_id: user._id.toHexString(),
-            username: user.username,
+            username: username,
             role: user.role,
             tenant_id: tenant_id
         };
@@ -95,12 +104,16 @@ export class UserService implements IUserService{
             }
         );
         const res: ILoginResponse = {
-            token: token
+            token: token,
+            user_id: user._id.toHexString()
         }
         return res;
     }
 
     public usernameExists = async (username: string, tenant_id: string): Promise<boolean> => {
+        if(!ObjectId.isValid(tenant_id))
+            throw new ArgumentError("tenant_id", "tenant_id is not valid");
+        UserService.validateUsername(username);
         const user = 
          await this.
             _mongoClient
@@ -111,6 +124,8 @@ export class UserService implements IUserService{
     }
 
     public exists = async (id: string): Promise<boolean> => {
+        if(!ObjectId.isValid(id))
+            throw new ArgumentError("id", "id is not valid");
         const user = 
          await this.
             _mongoClient
@@ -121,6 +136,8 @@ export class UserService implements IUserService{
     }
 
     public get = async (id: string): Promise<IUser> => {
+        if(!ObjectId.isValid(id))
+            throw new ArgumentError("id", "id is not valid");
         const user = 
          await this.
             _mongoClient
@@ -131,6 +148,8 @@ export class UserService implements IUserService{
     }
 
     public getMany = async (filter: IFilter, tenant_id: string): Promise<IPagedList<IUser>> =>{
+        if(!ObjectId.isValid(tenant_id))
+            throw new ArgumentError("tenant_id", "tenant_id is not valid");
         if(!filter.equal)
             filter.equal = [{field: "tenant_id", value: tenant_id}];
         else
@@ -153,15 +172,21 @@ export class UserService implements IUserService{
         return pagedList;
     }
 
-    public delete = async (id: string): Promise<void> => {
+    public delete = async (id: string): Promise<string> => {
+        if(!ObjectId.isValid(id))
+            throw new ArgumentError("id", "id is not valid");
+        const user = 
          await this.
             _mongoClient
                 .db()
-                .collection("users")
-                .deleteOne({ _id: ObjectId.createFromHexString(id) });
+                .collection<IUser>("users")
+                .findOneAndDelete({ _id: ObjectId.createFromHexString(id) }, { projection: { "username": 1 } });
+        return user.username;
     }
 
     public update = async (id: string, user: IUpdateUser): Promise<void> => {
+        if(!ObjectId.isValid(id))
+            throw new ArgumentError("id", "id is not valid");
         const set: any = {};
         if(user.firstname)
             set.firstname = user.firstname;
@@ -184,6 +209,8 @@ export class UserService implements IUserService{
     }
 
     public replace = async (id: string, user: IUpdateUser): Promise<void> => {
+        if(!ObjectId.isValid(id))
+            throw new ArgumentError("id", "id is not valid");
         const oldUser =
          await this.
             _mongoClient
@@ -192,6 +219,7 @@ export class UserService implements IUserService{
                 .findOne({ _id: ObjectId.createFromHexString(id) }, { projection: {"username": 1, "tenant_id": 1, "created_on": 1} });
         if(!oldUser)
             throw new NotFound("User does not exists");
+        UserService.validatePassword(user.password);
         const newUser: IUser = {
             _id: ObjectId.createFromHexString(id),
             tenant_id: oldUser.tenant_id,
@@ -212,6 +240,10 @@ export class UserService implements IUserService{
     }
 
     public create = async (user: ICreateUser, tenant_id: string): Promise<ObjectId> => {
+        if(!ObjectId.isValid(tenant_id))
+            throw new ArgumentError("tenant_id", "tenant_id is not valid");
+        UserService.validateUsername(user.username);
+        UserService.validatePassword(user.password);
         const newUser: IUser = {
             _id: null,
             tenant_id: tenant_id,
@@ -245,12 +277,5 @@ export class UserService implements IUserService{
     public static validatePassword = (password: string) =>{
         if(!UserService.isValidPassword(password))
             throw new ArgumentError("password", "Password is not valid. Password should be minimum 6 charecters and maximum 24. Allowed characters are a-z, A-Z, 0-9, '@', '$', '_' and '.'");
-    }
-
-    public static isValidId = (id: string) => ObjectId.isValid(id);
-
-    public static validateId = (id: string) =>{
-        if(!UserService.isValidId(id))
-            throw new ArgumentError("id", "Id is not valid.");
     }
 }
