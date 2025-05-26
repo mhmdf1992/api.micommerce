@@ -84,7 +84,7 @@ userRoutes.delete('/:id', async (req, res, next) => {
         const service = container.get<IUserService>(types.UserService);
         if(!await service.exists(req.params.id))
             throw new NotFound("User does not exists.");
-        await service.delete(req.params.id);
+        const user = await service.delete(req.params.id);
         res.body();
         res.activity({ 
             message: `deleted user ${user.firstname} ${user.lastname}`,
@@ -105,12 +105,12 @@ userRoutes.put(
     body('disabled').isBoolean().optional()
  ]), 
  async (req, res, next) => {
-    const user = req.body as IUpdateUser;
+    const payload = req.body as IUpdateUser;
     const service = container.get<IUserService>(types.UserService);
     try{
         if(!await service.exists(req.params.id))
             throw new NotFound("User does not exists.");
-        await service.replace(req.params.id, user);
+        const user = await service.replace(req.params.id, payload);
         res.body();
         res.activity({ 
             message: `updated user ${user.firstname} ${user.lastname}`,
@@ -132,12 +132,12 @@ userRoutes.patch(
     body('disabled').isBoolean().optional()
  ]), 
  async (req, res, next) => {
-    const user = req.body as IUpdateUser;
+    const payload = req.body as IUpdateUser;
     const service = container.get<IUserService>(types.UserService);
     try{
         if(!await service.exists(req.params.id))
             throw new NotFound("User does not exists.");
-        await service.update(req.params.id, user);
+        const user = await service.update(req.params.id, payload);
         res.body();
         res.activity({ 
             message: `updated user ${user.firstname} ${user.lastname}`,

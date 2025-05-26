@@ -8,7 +8,7 @@ import { ICreateTenant } from '../../dtos/tenant/create-tenant';
 import { ITenantService } from '../../services/tenant';
 import { ICreateTenantResponse } from '../../dtos/tenant/create-tenant-response';
 import { UserRole } from '../../data/models/user';
-import { body, param } from 'express-validator';
+import { body } from 'express-validator';
 import { validate } from './validate';
 import { IUpdateTenant } from '../../dtos/tenant/update-tenant';
 export const  tenantRoutes = express.Router();
@@ -19,11 +19,11 @@ tenantRoutes.post('/',
     body('domain').notEmpty(), 
     body('disabled').isBoolean().optional()]),
  async (req, res, next) => {
-    const tenant = req.body as ICreateTenant;
+    const payload = req.body as ICreateTenant;
     try{
         const tenantService = container.get<ITenantService>(types.TenantService);
         const userService = container.get<IUserService>(types.UserService);
-        const tenant_id = await tenantService.create(tenant);
+        const tenant_id = await tenantService.create(payload);
         const admin_user = {
             firstname: "admin",
             lastname: "admin",
@@ -39,10 +39,9 @@ tenantRoutes.post('/',
             admin_password: admin_user.password
         }
         res.body(response)
-        res.activity({ 
-            action: "created",
-            entity: "tenant",
-            value: tenant.name 
+        res.activity({
+            message: `created tenant ${payload.name}`,
+            reference: tenant_id.toHexString()
         });
     }catch(err){
         return next(err);
@@ -84,17 +83,11 @@ tenantRoutes.delete('/:id', async (req, res, next) => {
         const service = container.get<ITenantService>(types.TenantService);
         if(!await service.exists(req.params.id))
             throw new NotFound("Tenant does not exists.");
-        await service.delete(req.params.id);
-        res.activity = { 
-            action: "deleted",
-            entity: "tenant",
-            value: req.params.id
-        }
+        const tenant = await service.delete(req.params.id);
         res.body();
         res.activity({
-            entity: "tenant",
-            action: "deleted",
-            value: req.params.id
+            message: `deleted tenant ${tenant.name}`,
+            reference: req.params.id
         });
     }catch(err){
         return next(err);
@@ -109,17 +102,16 @@ tenantRoutes.put(
     body('disabled').isBoolean().optional()
  ]), 
  async (req, res, next) => {
-    const tenant = req.body as IUpdateTenant;
+    const payload = req.body as IUpdateTenant;
     const service = container.get<ITenantService>(types.TenantService);
     try{
         if(!await service.exists(req.params.id))
             throw new NotFound("Tenant does not exists.");
-        await service.replace(req.params.id, tenant);
+        const tenant = await service.replace(req.params.id, payload);
         res.body();
-        res.activity({ 
-            action: "replaced",
-            entity: "tenant",
-            value: tenant.name 
+        res.activity({
+            message: `updated tenant ${tenant.name}`,
+            reference: req.params.id
         });
     }catch(err){
         return next(err);
@@ -134,17 +126,16 @@ tenantRoutes.patch(
     body('disabled').isBoolean().optional()
  ]), 
  async (req, res, next) => {
-    const tenant = req.body as IUpdateTenant;
+    const payload = req.body as IUpdateTenant;
     const service = container.get<ITenantService>(types.TenantService);
     try{
         if(!await service.exists(req.params.id))
             throw new NotFound("Tenant does not exists.");
-        await service.update(req.params.id, tenant);
+        const tenant = await service.update(req.params.id, payload);
         res.body();
-        res.activity({ 
-            action: "updated",
-            entity: "tenant",
-            value: tenant.name 
+        res.activity({
+            message: `updated tenant ${tenant.name}`,
+            reference: req.params.id
         });
     }catch(err){
         return next(err);

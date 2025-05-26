@@ -16,10 +16,10 @@ export interface ITenantService{
     exists(id: string): Promise<boolean>;
     get(id: string): Promise<ITenant>;
     getMany(filter: IFilter): Promise<IPagedList<ITenant>>;
-    delete(id: string): Promise<void>;
-    update(id: string, tenant: IUpdateTenant): Promise<void>;
-    replace(id: string, tenant: IUpdateTenant): Promise<void>;
-    create(tenant: ICreateTenant): Promise<ObjectId>;
+    delete(id: string): Promise<ITenant>;
+    update(id: string, tenantUpdate: IUpdateTenant): Promise<ITenant>;
+    replace(id: string, tenantUpdate: IUpdateTenant): Promise<ITenant>;
+    create(tenantCreate: ICreateTenant): Promise<ObjectId>;
 }
 
 @injectable()
@@ -98,35 +98,37 @@ export class TenantService implements ITenantService{
         return pagedList;
     }
 
-    public delete = async (id: string): Promise<void> => {
+    public delete = async (id: string): Promise<ITenant> => {
         if(!ObjectId.isValid(id))
             throw new ArgumentError("id", "id is not valid");
-         await this.
+        const tenant = await this.
             _mongoClient
                 .db()
-                .collection("tenants")
-                .deleteOne({ _id: ObjectId.createFromHexString(id) });
+                .collection<ITenant>("tenants")
+                .findOneAndDelete({ _id: ObjectId.createFromHexString(id) });
+        return tenant;
     }
 
-    public update = async (id: string, tenant: IUpdateTenant): Promise<void> => {
+    public update = async (id: string, tenantUpdate: IUpdateTenant): Promise<ITenant> => {
         if(!ObjectId.isValid(id))
             throw new ArgumentError("id", "id is not valid");
         const set: any = {};
-        if(tenant.name)
-            set.name = tenant.name;
-        if(tenant.domain)
-            set.domain = tenant.domain;
-        if(tenant.disabled === false || tenant.disabled === true)
-            set.disabled = tenant.disabled;
+        if(tenantUpdate.name)
+            set.name = tenantUpdate.name;
+        if(tenantUpdate.domain)
+            set.domain = tenantUpdate.domain;
+        if(tenantUpdate.disabled === false || tenantUpdate.disabled === true)
+            set.disabled = tenantUpdate.disabled;
         set.updated_on = new Date();
-        await this.
+        const tenant = await this.
          _mongoClient
             .db()
-            .collection("tenants")
-            .updateOne({ _id: ObjectId.createFromHexString(id) }, {$set: set});
+            .collection<ITenant>("tenants")
+            .findOneAndUpdate({ _id: ObjectId.createFromHexString(id) }, {$set: set});
+        return tenant;
     }
 
-    public replace = async (id: string, tenant: IUpdateTenant): Promise<void> => {
+    public replace = async (id: string, tenantUpdate: IUpdateTenant): Promise<ITenant> => {
         if(!ObjectId.isValid(id))
             throw new ArgumentError("id", "id is not valid");
         const oldTenant =
@@ -139,26 +141,27 @@ export class TenantService implements ITenantService{
             throw new NotFound("Tenant does not exists");
         const newTenant: ITenant = {
             _id: oldTenant._id,
-            name: tenant.name,
-            domain: tenant.domain,
-            disabled: tenant.disabled,
+            name: tenantUpdate.name,
+            domain: tenantUpdate.domain,
+            disabled: tenantUpdate.disabled,
             created_on: oldTenant.created_on,
             updated_on: new Date()
         };
-        await this.
+        const tenant = await this.
          _mongoClient
             .db()
             .collection<ITenant>("tenants")
-            .replaceOne({ _id: ObjectId.createFromHexString(id) }, newTenant);
+            .findOneAndReplace({ _id: ObjectId.createFromHexString(id) }, newTenant);
+        return tenant;
     }
 
-    public create = async (tenant: ICreateTenant): Promise<ObjectId> => {
+    public create = async (tenantCreate: ICreateTenant): Promise<ObjectId> => {
         const newTenant: ITenant = {
             _id: null,
-            name: tenant.name,
-            domain: tenant.domain,
+            name: tenantCreate.name,
+            domain: tenantCreate.domain,
             created_on: new Date(),
-            disabled: tenant.disabled ?? false
+            disabled: tenantCreate.disabled ?? false
         };
         await this.
          _mongoClient
